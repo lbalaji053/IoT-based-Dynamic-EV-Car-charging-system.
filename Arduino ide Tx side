@@ -1,0 +1,143 @@
+#include <WiFi.h>
+#include <ThingSpeak.h>
+#include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// ---------- WIFI ----------
+const char* ssid = "govinda";
+const char* password = "balu9397";
+
+// ---------- THINGSPEAK ----------
+unsigned long channelID = 3213332;
+const char* apiKey = "MZ6GNAZTKUCIR6NV";
+WiFiClient client;
+
+// ---------- PINS ----------
+#define IR1 34
+#define IR2 35
+#define IR3 32
+#define IR4 33
+
+#define RELAY1 23
+#define RELAY2 22
+#define RELAY3 21
+#define RELAY4 19
+
+#define PULSE_EN 13
+
+#define DHTPIN 27
+#define DHTTYPE DHT11
+#define BAT_ADC 36
+
+// ---------- OBJECTS ----------
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// ---------- VARIABLES ----------
+float batteryVoltage = 0;
+int batteryPercent = 0;
+bool powerStatus = false;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+  pinMode(IR3, INPUT);
+  pinMode(IR4, INPUT);
+
+  pinMode(RELAY1, OUTPUT);
+  pinMode(RELAY2, OUTPUT);
+  pinMode(RELAY3, OUTPUT);
+  pinMode(RELAY4, OUTPUT);
+  pinMode(PULSE_EN, OUTPUT);
+
+  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY3, LOW);
+  digitalWrite(RELAY4, LOW);
+  digitalWrite(PULSE_EN, LOW);
+
+  dht.begin();
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0,0);
+  lcd.print("SMART ROAD EV");
+  delay(2000);
+  lcd.clear();
+
+  // WIFI
+  WiFi.begin(ssid, password);
+  lcd.print("WiFi Connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    lcd.print(".");
+  }
+
+  lcd.clear();
+  lcd.print("WiFi Connected");
+  delay(1500);
+  lcd.clear();
+
+  ThingSpeak.begin(client);
+}
+
+void loop() {
+
+  // ---------- IR SENSOR CHECK ----------
+  if (digitalRead(IR1) == LOW || digitalRead(IR2) == LOW ||
+      digitalRead(IR3) == LOW || digitalRead(IR4) == LOW) {
+
+    digitalWrite(RELAY1, HIGH);
+    digitalWrite(RELAY2, HIGH);
+    digitalWrite(RELAY3, HIGH);
+    digitalWrite(RELAY4, HIGH);
+    digitalWrite(PULSE_EN, HIGH);
+    powerStatus = true;
+
+  } else {
+    digitalWrite(RELAY1, LOW);
+    digitalWrite(RELAY2, LOW);
+    digitalWrite(RELAY3, LOW);
+    digitalWrite(RELAY4, LOW);
+    digitalWrite(PULSE_EN, LOW);
+    powerStatus = false;
+  }
+
+  // ---------- BATTERY VOLTAGE ----------
+  int adcValue = analogRead(BAT_ADC);
+  batteryVoltage = (adcValue / 4095.0) * 3.3 * 5; // voltage divider
+
+  batteryPercent = map(batteryVoltage * 10, 110, 126, 0, 100);
+  batteryPercent = constrain(batteryPercent, 0, 100);
+
+  // ---------- DHT ----------
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+
+  // ---------- LCD DISPLAY ----------
+  lcd.setCursor(0,0);
+  lcd.print("BAT:");
+  lcd.print(batteryPercent);
+  lcd.print("% ");
+
+  lcd.print(powerStatus ? "ON " : "OFF");
+
+  lcd.setCursor(0,1);
+  lcd.print(temp);
+  lcd.print("C ");
+  lcd.print(hum);
+  lcd.print("%   ");
+
+  // ---------- THINGSPEAK ----------
+  ThingSpeak.setField(1, batteryPercent);
+  ThingSpeak.setField(2, temp);
+  ThingSpeak.setField(3, hum);
+  ThingSpeak.setField(4, powerStatus);
+
+  ThingSpeak.writeFields(channelID, apiKey);
+
+  delay(15000); // ThingSpeak limit
+}
