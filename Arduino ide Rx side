@@ -1,0 +1,81 @@
+#include <AFMotor.h>
+
+
+// ---------- LCD ----------
+
+
+// ---------- ULTRASONIC ----------
+#define trigPin 8
+#define echoPin 9
+
+// ---------- VOLTMETER ----------
+#define VOLT_PIN A0
+
+// ---------- MOTORS ----------
+AF_DCMotor motor1(1); // M1
+AF_DCMotor motor2(2); // M2
+AF_DCMotor motor3(3); // M3
+AF_DCMotor motor4(4); // M4
+
+long duration;
+int distance;
+float voltage;
+
+void setup() {
+  
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  motor1.setSpeed(70);
+  motor2.setSpeed(70);
+  motor3.setSpeed(70);
+  motor4.setSpeed(70);
+
+  
+}
+
+void loop() {
+
+  // ---------- ULTRASONIC ----------
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH, 25000);
+  distance = duration * 0.034 / 2;
+
+  // ---------- VOLTAGE ----------
+  int adc = analogRead(VOLT_PIN);
+  voltage = adc * (5.0 / 1023.0) * 5;  // adjust divider factor
+
+  
+
+ 
+
+  // ---------- OBSTACLE AVOID ----------
+  if (distance > 0 && distance < 20) {
+    stopMotors();
+  } else {
+    moveForward();
+  }
+
+  delay(300);
+}
+
+// ---------- MOTOR FUNCTIONS ----------
+void moveForward() {
+  motor1.run(BACKWARD);
+  motor2.run(FORWARD);
+  motor3.run(BACKWARD);
+  motor4.run(FORWARD);
+}
+
+void stopMotors() {
+  motor1.run(RELEASE);
+  motor2.run(RELEASE);
+  motor3.run(RELEASE);
+  motor4.run(RELEASE);
+}
